@@ -91,6 +91,7 @@ This is a monorepo using pnpm workspaces and Turborepo. To get started:
    - Start web development server: `cd packages/web && pnpm dev`
    - Build plugin: `cd packages/plugin && pnpm build`
    - Build audio server: `cd packages/audio-server && pnpm build`
+   - Run lint checks: `pnpm lint`
 The project consists of the following packages:
 - `packages/plugin`: The Obsidian plugin
 - `packages/web`: The web application
