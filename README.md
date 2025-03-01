@@ -1,6 +1,6 @@
 # Note Companion AI (prev. File Organizer 2000)
 
-Note Companion is an AI-powered Obsidian plugin that automatically organizes and formats your notes—so you don’t have to.
+Note Companion is an AI-powered Obsidian plugin that automatically organizes and formats your notes—so you don't have to. It helps you maintain a clean and well-structured knowledge base.
 
 <p>
   <a href="https://fileorganizer2000.com/"><img src="https://img.shields.io/badge/Try-Note%20Companion-7852ee?style=flat&logoColor=white" alt="Try Note Companion"></a>
