@@ -20,6 +20,8 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { usePlugin } from "./provider";
 import { Inbox } from "../../inbox";
+import { VALID_MEDIA_EXTENSIONS, VALID_AUDIO_EXTENSIONS, VALID_IMAGE_EXTENSIONS } from "../../constants";
+import { TFile, Notice } from "obsidian";
 
 // Add a tooltip component for error details
 const ErrorTooltip: React.FC<{ error: LogEntry["error"] }> = ({
@@ -167,47 +169,176 @@ const PathDisplay: React.FC<{ record: FileRecord }> = ({ record }) => {
   );
 };
 
+// Add this component for essential information display
+const EssentialInfoDisplay: React.FC<{ record: FileRecord }> = ({ record }) => {
+  const plugin = usePlugin();
+  const hasRename = record.newName && record.originalName !== record.newName;
+  const hasMove = record.newPath;
+  
+  // Helper function to find action logs and get timestamps
+  const getActionTimestamp = (actionContains: string): string | null => {
+    const found = Object.entries(record.logs).find(
+      ([actionKey]) => actionKey.includes(actionContains)
+    );
+    return found ? (found[1] as LogEntry).timestamp : null;
+  };
+  
+  // Format timestamp using moment
+  const formatTimestamp = (ts: string | null): string => {
+    return ts ? moment(ts).format("HH:mm:ss") : "";
+  };
+  
+  // Get file extension
+  const fileExtension = record.originalName.split('.').pop()?.toLowerCase() || '';
+  
+  // Check for specific actions in the logs
+  const hasTranscribedAudio = Object.keys(record.logs).some(action => 
+    action.includes("EXTRACT_DONE") && 
+    VALID_AUDIO_EXTENSIONS.some(ext => fileExtension === ext)
+  );
+  
+  const audioTimestamp = hasTranscribedAudio ? 
+    getActionTimestamp("EXTRACT_DONE") : null;
+  
+  const hasProcessedImage = Object.keys(record.logs).some(action => 
+    action.includes("EXTRACT_DONE") && 
+    VALID_IMAGE_EXTENSIONS.some(ext => fileExtension === ext)
+  );
+  
+  const imageTimestamp = hasProcessedImage ? 
+    getActionTimestamp("EXTRACT_DONE") : null;
+  
+  const hasYouTubeTranscript = Object.keys(record.logs).some(action => 
+    action.includes("FETCH_YOUTUBE")
+  );
+  
+  const youtubeTimestamp = hasYouTubeTranscript ? 
+    getActionTimestamp("FETCH_YOUTUBE_DONE") : null;
+    
+  const hasFormatted = record.formatted || Object.keys(record.logs).some(action => 
+    action.includes("FORMATTING_DONE")
+  );
+  
+  const formattingTimestamp = hasFormatted ? 
+    getActionTimestamp("FORMATTING_DONE") : null;
+  
+  if (!hasRename && !hasMove && !hasTranscribedAudio && !hasProcessedImage && 
+      record.tags.length === 0 && !hasYouTubeTranscript && !hasFormatted) {
+    return null;
+  }
+  
+  return (
+    <div className="space-y-2">
+      {hasRename && (
+        <div className="text-sm">
+          Renamed as{" "}
+          <span 
+            className="text-[--text-accent] cursor-pointer hover:underline"
+            onClick={() => 
+              plugin.app.workspace.openLinkText(
+                record.newName || '',
+                record.file?.parent?.path || ''
+              )
+            }
+          >
+            {record.newName}
+          </span>
+          {" "}
+          <span className="text-[--text-muted] text-xs">
+            {formatTimestamp(getActionTimestamp("RENAME_DONE"))}
+          </span>
+        </div>
+      )}
+      
+      {hasMove && (
+        <div className="text-sm">
+          Moved to{" "}
+          <span 
+            className="text-[--text-accent] cursor-pointer hover:underline"
+            onClick={() => 
+              plugin.app.workspace.openLinkText(
+                record.file?.basename || '',
+                record.newPath || ''
+              )
+            }
+          >
+            {record.newPath}
+          </span>
+          {" "}
+          <span className="text-[--text-muted] text-xs">
+            {formatTimestamp(getActionTimestamp("MOVING_DONE"))}
+          </span>
+        </div>
+      )}
+      
+      {hasTranscribedAudio && (
+        <div className="text-sm">
+          Transcribed audio{" "}
+          <span className="text-[--text-muted] text-xs">
+            {formatTimestamp(audioTimestamp)}
+          </span>
+        </div>
+      )}
+      
+      {hasProcessedImage && (
+        <div className="text-sm">
+          Processed image{" "}
+          <span className="text-[--text-muted] text-xs">
+            {formatTimestamp(imageTimestamp)}
+          </span>
+        </div>
+      )}
+      
+      {hasFormatted && (
+        <div className="text-sm">
+          Note formatted as{" "}
+          <span 
+            className="text-[--text-accent] cursor-pointer hover:underline"
+            onClick={() => {
+              // Open the template file when clicked
+              if (record.classification) {
+                const templatePath = `${plugin.settings.templatePaths}/${record.classification}.md`;
+                const templateFile = plugin.app.vault.getAbstractFileByPath(templatePath);
+                if (templateFile) {
+                  plugin.app.workspace.getLeaf().openFile(templateFile as TFile);
+                } else {
+                  // If template file not found, show notification
+                  new Notice(`Template file not found: ${templatePath}`);
+                }
+              }
+            }}
+          >
+            {record.classification || "document"}
+          </span>
+          {" "}
+          <span className="text-[--text-muted] text-xs">
+            {formatTimestamp(formattingTimestamp)}
+          </span>
+        </div>
+      )}
+      
+      {record.tags.length > 0 && (
+        <div className="text-sm">
+          Added tags:{" "}
+          {record.tags.join(', ')}
+        </div>
+      )}
+      
+      {hasYouTubeTranscript && (
+        <div className="text-sm">
+          Extracted YouTube transcript{" "}
+          <span className="text-[--text-muted] text-xs">
+            {formatTimestamp(youtubeTimestamp)}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // Main file card component
 function FileCard({ record }: { record: FileRecord }) {
   const plugin = usePlugin();
-  const [isExpanded, setIsExpanded] = React.useState(false);
-
-  // Create a stable key for memoization
-  const logsKey = React.useMemo(() => {
-    return Object.entries(record.logs)
-      .map(([action, log]) => `${action}-${log.timestamp}`)
-      .join('|');
-  }, [record.logs]);
-
-  // Memoize sorted logs using the stable key
-  const sortedLogs = React.useMemo(() => {
-    return Object.entries(record.logs)
-      .sort(([_, a], [__, b]) => 
-        moment(b.timestamp).diff(moment(a.timestamp))
-      )
-      .map(([action, log]) => [action as Action, log] as [Action, LogEntry]);
-  }, [logsKey]);
-
-  // Add status indicators - only show when present
-  const StatusIndicators = () => {
-    const hasStatus = record.classification || record.tags.length > 0;
-    if (!hasStatus) return null;
-
-    return (
-      <div className="flex items-center gap-2">
-        {record.classification && (
-          <span className="px-2 py-0.5 rounded-full text-xs bg-[--background-modifier-success] text-[--text-on-accent]">
-            Classified
-          </span>
-        )}
-        {record.tags.length > 0 && (
-          <span className="px-2 py-0.5 rounded-full text-xs bg-[--background-modifier-success] text-[--text-on-accent]">
-            Tagged
-          </span>
-        )}
-      </div>
-    );
-  };
 
   return (
     <motion.div
@@ -223,8 +354,8 @@ function FileCard({ record }: { record: FileRecord }) {
                 className="cursor-pointer"
                 onClick={() =>
                   plugin.app.workspace.openLinkText(
-                    record.file?.basename,
-                    record.file?.parent.path
+                    record.file?.basename || '',
+                    record.file?.parent?.path || ''
                   )
                 }
               >
@@ -232,64 +363,11 @@ function FileCard({ record }: { record: FileRecord }) {
               </div>
               <StatusBadge status={record.status} />
             </div>
-            <button
-              onClick={() => setIsExpanded(!isExpanded)}
-              className="flex items-center gap-2 text-[--text-muted]"
-            >
-              <ChevronDown
-                className={`w-4 h-4 transition-transform ${
-                  isExpanded ? "rotate-180" : ""
-                }`}
-              />
-            </button>
           </div>
 
-          {/* Status indicators - only shown when present */}
-          <StatusIndicators />
-
-          {/* Path display */}
-          <PathDisplay record={record} />
-
-          {/* Always visible info - only when present */}
-          <div className="space-y-2">
-            {record.classification && (
-              <div className="text-sm">
-                Classification:{" "}
-                <span className="text-[--text-accent]">
-                  {record.classification}
-                </span>
-              </div>
-            )}
-            {record.tags.length > 0 && (
-              <div className="flex gap-1 flex-wrap">
-                {record.tags.map((tag, i) => (
-                  <span
-                    key={i}
-                    className="px-2 py-0.5 bg-[--background-secondary] rounded-full text-xs"
-                  >
-                    {tag}
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
+          {/* Essential information display */}
+          <EssentialInfoDisplay record={record} />
         </div>
-
-        {/* Expanded logs */}
-        <AnimatePresence>
-          {isExpanded && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              className="mt-4 space-y-1 border-t border-[--background-modifier-border] pt-4"
-            >
-              {sortedLogs.map(([action, log]) => (
-                <LogEntryDisplay key={action} entry={log} step={action} />
-              ))}
-            </motion.div>
-          )}
-        </AnimatePresence>
       </div>
     </motion.div>
   );
