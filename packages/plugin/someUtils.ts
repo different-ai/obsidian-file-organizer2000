@@ -3,6 +3,12 @@ import { logger } from "./services/logger";
 export function formatToSafeName(format: string) {
   return format.replace(/[\\/:"]/g, "");
 }
+
+export function sanitizeFileName(fileName: string): string {
+  if (!fileName) return "";
+  // Replace invalid characters (/, \, :, *, ?, ", <, >, |) with dashes (-)
+  return fileName.replace(/[\/\\:*?"<>|]/g, "-");
+}
 export function cleanPath(path: string) {
   const trimmedPath = path.trim();
   // cleanup path remove leading and trailing slashes

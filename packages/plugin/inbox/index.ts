@@ -8,7 +8,7 @@ import {
   FileStatus,
 } from "./services/record-manager";
 import { QueueStatus } from "./types";
-import { logMessage } from "../someUtils";
+import { logMessage, sanitizeFileName } from "../someUtils";
 import { IdService } from "./services/id-service";
 import { logger } from "../services/logger";
 import {
@@ -476,6 +476,10 @@ async function recommendNameStep(
   if (!context.newName || context.newName === context.containerFile.basename) {
     return context;
   }
+  
+  // Sanitize the new name to replace invalid characters with dashes
+  const sanitizedName = sanitizeFileName(context.newName);
+  context.newName = sanitizedName;
   
   context.recordManager.setNewName(context.hash, context.newName);
   await safeRename(context.plugin.app, context.containerFile, context.newName);

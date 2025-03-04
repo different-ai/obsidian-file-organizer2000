@@ -5,7 +5,7 @@ import { z } from "zod";
 import { motion, AnimatePresence } from "framer-motion";
 import { SkeletonLoader } from "../components/skeleton-loader";
 import { ExistingFolderButton } from "../components/suggestion-buttons";
-import { logMessage } from "../../../../someUtils";
+import { logMessage, sanitizeFileName } from "../../../../someUtils";
 import { logger } from "../../../../services/logger";
 
 interface RenameSuggestionProps {
@@ -65,10 +65,13 @@ export const RenameSuggestion: React.FC<RenameSuggestionProps> = ({
     if (title === file?.basename) return;
     if (!file?.parent) return;
 
+    // Sanitize the title to replace invalid characters with dashes
+    const sanitizedTitle = sanitizeFileName(title);
+
     setLoading(true);
     try {
-      await plugin.moveFile(file, title, file.parent.path);
-      new Notice(`Renamed to ${title}`);
+      await plugin.moveFile(file, sanitizedTitle, file.parent.path);
+      new Notice(`Renamed to ${sanitizedTitle}`);
     } catch (error) {
       logger.error("Error renaming file:", error);
       const errorMessage =
