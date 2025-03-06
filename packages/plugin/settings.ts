@@ -1,5 +1,8 @@
 export class FileOrganizerSettings {
   API_KEY = "";
+  CLERK_SESSION_TOKEN = ""; // Store Clerk session token
+  CLERK_EMAIL = ""; // Store Clerk email
+  CLERK_PASSWORD = ""; // Store Clerk password
   isLicenseValid = false;
   useLogs = true;
   defaultDestinationPath = "_FileOrganizer2000/Processed";

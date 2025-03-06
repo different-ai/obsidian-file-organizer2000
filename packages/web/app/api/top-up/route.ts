@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { getToken, handleAuthorizationV2 } from "@/lib/handleAuthorization";
+import { handleClerkAuthorization } from "@/lib/handleClerkAuthorization";
 import { createAnonymousUser } from "../anon";
 import { createLicenseKeyFromUserId } from "@/app/actions";
 import { createEmptyUserUsage } from "@/drizzle/schema";
@@ -27,8 +28,24 @@ async function ensureAuthorizedUser(req: NextRequest) {
   const initialLicenseKey = getToken(req);
 
   try {
-    const { userId } = await handleAuthorizationV2(req);
-    return { userId, licenseKey: initialLicenseKey };
+    // Try Clerk authentication first
+    try {
+      const { userId } = await handleClerkAuthorization(req);
+      return { userId, licenseKey: initialLicenseKey };
+    } catch (clerkError) {
+      // Fall back to API key authentication
+      try {
+        const { userId } = await handleAuthorizationV2(req);
+        return { userId, licenseKey: initialLicenseKey };
+      } catch (apiKeyError) {
+        // In development mode, use a default user ID
+        if (process.env.NODE_ENV === "development") {
+          return { userId: "dev-user", licenseKey: initialLicenseKey || "dev-key" };
+        } else {
+          throw apiKeyError;
+        }
+      }
+    }
   } catch (error) {
     console.log("Authorization failed, creating anonymous user:", error);
     return createFallbackUser();

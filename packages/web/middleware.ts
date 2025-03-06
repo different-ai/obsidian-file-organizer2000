@@ -13,8 +13,28 @@ const isPublicRoute = createRouteMatcher([
 
 const isClerkProtectedRoute = createRouteMatcher(["/(.*)"]);
 
-const userManagementMiddleware = () =>
-  clerkMiddleware(async (auth, req) => {
+// For development environment, use a simplified middleware when Clerk keys are not valid
+const devUserManagementMiddleware = (req: NextRequest) => {
+  console.log("devUserManagementMiddleware");
+  
+  if (isPublicRoute(req)) {
+    console.log("isPublicRoute");
+    return NextResponse.next();
+  }
+  
+  return NextResponse.next();
+};
+
+const userManagementMiddleware = () => {
+  // In development mode with invalid Clerk keys, use the simplified middleware
+  if (process.env.NODE_ENV === "development" && 
+      (process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY === "pk_test_placeholder" || 
+       process.env.CLERK_SECRET_KEY === "sk_test_placeholder")) {
+    return devUserManagementMiddleware;
+  }
+  
+  // Use the real Clerk middleware in production or with valid keys
+  return clerkMiddleware(async (auth, req) => {
     console.log("userManagementMiddleware");
 
     if (isPublicRoute(req)) {
@@ -25,12 +45,14 @@ const userManagementMiddleware = () =>
       console.log("isClerkProtectedRoute");
       const { userId } = await auth();
       console.log("userId", userId);
-      if (!userId) {
-        // (await auth()).redirectToSignIn();
+      if (!userId && !isApiRoute(req)) {
+        // Only redirect to sign-in for non-API routes
+        return NextResponse.redirect(new URL('/sign-in', req.url));
       }
     }
     return NextResponse.next();
   });
+};
 
 const soloApiKeyMiddleware = (req: NextRequest) => {
   if (isApiRoute(req)) {

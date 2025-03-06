@@ -129,7 +129,7 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
   if (!isLicenseValid) {
     return (
       <LicenseValidator
-        apiKey={plugin.settings.API_KEY}
+        authToken={plugin.getAuthToken()}
         onValidationComplete={() => setIsLicenseValid(true)}
         plugin={plugin}
       />

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { handleAuthorization } from "@/lib/handleAuthorization";
+import { handleAuthorization, handleAuthorizationV2 } from "@/lib/handleAuthorization";
+import { handleClerkAuthorization } from "@/lib/handleClerkAuthorization";
 import { incrementAndLogTokenUsage } from "@/lib/incrementAndLogTokenUsage";
 import { getModel } from "@/lib/models";
 import { z } from "zod";
@@ -18,7 +19,27 @@ const modifySchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId } = await handleAuthorization(request);
+    let userId;
+    
+    // Try Clerk authentication first
+    try {
+      const result = await handleClerkAuthorization(request);
+      userId = result.userId;
+    } catch (clerkError) {
+      // Fall back to API key authentication
+      try {
+        const result = await handleAuthorizationV2(request);
+        userId = result.userId;
+      } catch (apiKeyError) {
+        // In development mode, use a default user ID
+        if (process.env.NODE_ENV === "development") {
+          userId = "dev-user";
+        } else {
+          throw apiKeyError;
+        }
+      }
+    }
+    
     const { content, originalContent, instructions } = await request.json();
     const model = getModel(process.env.MODEL_NAME);
 
@@ -55,4 +76,4 @@ export async function POST(request: NextRequest) {
       { status: error.status || 500 }
     );
   }
-} 
+}      

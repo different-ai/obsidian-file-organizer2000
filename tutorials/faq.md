@@ -19,7 +19,7 @@ A: Premium support is provided via email and Discord community. Plus an onboardi
 
 **Q: What’s the process for upgrading from Hobby to Lifetime? The Stripe page only allows me to update my existing subscription**
 (e.g. Monthly to Yearly)
-A: It's possible via this link: https://app.fileorganizer2000.com/dashboard/pricing
+A: It's possible via this link: https://app.notecompanion.ai/dashboard/pricing
 
 **Q: Is Note Companion compatible with local LLMs?**
 

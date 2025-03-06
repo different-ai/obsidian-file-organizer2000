@@ -1,7 +1,8 @@
 import { convertToCoreMessages, streamText, createDataStreamResponse, generateId } from "ai";
 import { NextResponse, NextRequest } from "next/server";
 import { incrementAndLogTokenUsage } from "@/lib/incrementAndLogTokenUsage";
-import { handleAuthorization } from "@/lib/handleAuthorization";
+import { handleAuthorization, handleAuthorizationV2 } from "@/lib/handleAuthorization";
+import { handleClerkAuthorization } from "@/lib/handleClerkAuthorization";
 import { GoogleGenerativeAIProviderMetadata } from "@ai-sdk/google";
 import { z } from "zod";
 
@@ -21,7 +22,27 @@ export async function POST(req: NextRequest) {
   return createDataStreamResponse({
     execute: async (dataStream) => {
       try {
-        const { userId } = await handleAuthorization(req);
+        let userId;
+        
+        // Try Clerk authentication first
+        try {
+          const result = await handleClerkAuthorization(req);
+          userId = result.userId;
+        } catch (clerkError) {
+          // Fall back to API key authentication
+          try {
+            const result = await handleAuthorizationV2(req);
+            userId = result.userId;
+          } catch (apiKeyError) {
+            // In development mode, use a default user ID
+            if (process.env.NODE_ENV === "development") {
+              userId = "dev-user";
+            } else {
+              throw apiKeyError;
+            }
+          }
+        }
+        
         const {
           messages,
           newUnifiedContext,

@@ -1,16 +1,16 @@
 import * as React from "react";
 import { ErrorBox } from "./error-box";
 import { EmptyState } from "./empty-state";
-import FileOrganizer from "../../..";
+import FileOrganizer from "../../../../index";
 
 interface LicenseValidatorProps {
-  apiKey: string;
+  authToken: string;
   onValidationComplete: () => void;
   plugin: FileOrganizer;
 }
 
 export const LicenseValidator: React.FC<LicenseValidatorProps> = ({
-  apiKey,
+  authToken,
   onValidationComplete,
   plugin,
 }) => {
@@ -27,7 +27,7 @@ export const LicenseValidator: React.FC<LicenseValidatorProps> = ({
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
+          Authorization: `Bearer ${authToken}`,
         },
       });
 
@@ -45,7 +45,7 @@ export const LicenseValidator: React.FC<LicenseValidatorProps> = ({
     } finally {
       setIsValidating(false);
     }
-  }, [apiKey, onValidationComplete]);
+  }, [authToken, onValidationComplete]);
 
   React.useEffect(() => {
     validateLicense();
@@ -83,4 +83,4 @@ export const LicenseValidator: React.FC<LicenseValidatorProps> = ({
   }
 
   return null;
-}; 
+};

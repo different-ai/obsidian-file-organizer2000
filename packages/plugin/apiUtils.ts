@@ -37,3 +37,23 @@ export async function checkLicenseKey(
     return false;
   }
 }
+
+export async function checkClerkAuth(
+  serverUrl: string,
+  token: string
+): Promise<boolean> {
+  try {
+    const response: RequestUrlResponse = await requestUrl({
+      url: `${serverUrl}/api/auth/validate`,
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    return response.status === 200;
+  } catch (error) {
+    logger.error("Error checking Clerk authentication:", error);
+    return false;
+  }
+}

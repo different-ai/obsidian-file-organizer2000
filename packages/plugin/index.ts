@@ -50,8 +50,9 @@ import {
   moveFile,
 } from "./fileUtils";
 
-import { checkLicenseKey } from "./apiUtils";
+import { checkLicenseKey, checkClerkAuth } from "./apiUtils";
 import { makeApiRequest } from "./apiUtils";
+import { signInWithClerk, refreshClerkToken, isClerkTokenValid, ClerkAuthResponse } from "./auth/clerk";
 
 import {
   VALID_IMAGE_EXTENSIONS,
@@ -122,7 +123,7 @@ export default class FileOrganizer extends Plugin {
         : this.getServerUrl();
     const premiumStatus = await fetch(`${serverUrl}/api/check-premium`, {
       headers: {
-        Authorization: `Bearer ${this.settings.API_KEY}`,
+        Authorization: `Bearer ${this.getAuthToken()}`,
       },
     });
     const { hasCatalystAccess } = await premiumStatus.json();
@@ -171,7 +172,7 @@ export default class FileOrganizer extends Plugin {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${this.settings.API_KEY}`,
+            Authorization: `Bearer ${this.getAuthToken()}`,
           },
           body: JSON.stringify({ content }),
         }
@@ -199,7 +200,7 @@ export default class FileOrganizer extends Plugin {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${this.settings.API_KEY}`,
+          Authorization: `Bearer ${this.getAuthToken()}`,
         },
         body: JSON.stringify({
           content,
@@ -274,7 +275,7 @@ export default class FileOrganizer extends Plugin {
         content,
         formattingInstruction,
         this.getServerUrl(),
-        this.settings.API_KEY,
+        this.getAuthToken(),
         updateCallback
       );
 
@@ -314,7 +315,7 @@ export default class FileOrganizer extends Plugin {
         content,
         formattingInstruction,
         this.getServerUrl(),
-        this.settings.API_KEY,
+        this.getAuthToken(),
         updateCallback
       );
       this.appendBackupLinkToCurrentFile(file, backupFile);
@@ -348,7 +349,7 @@ export default class FileOrganizer extends Plugin {
         content,
         formattingInstruction,
         this.getServerUrl(),
-        this.settings.API_KEY,
+        this.getAuthToken(),
         updateCallback
       );
 
@@ -405,7 +406,7 @@ export default class FileOrganizer extends Plugin {
         content,
         formattingInstruction,
         this.getServerUrl(),
-        this.getApiKey(),
+        this.getAuthToken(),
         updateCallback
       );
 
@@ -450,6 +451,53 @@ export default class FileOrganizer extends Plugin {
   getApiKey(): string {
     return this.settings.API_KEY;
   }
+  
+  getAuthToken(): string {
+    // Use Clerk session token if available, otherwise fall back to API key
+    return this.settings.CLERK_SESSION_TOKEN || this.settings.API_KEY;
+  }
+  
+  async signInWithClerk(email: string, password: string): Promise<boolean> {
+    try {
+      const auth = await signInWithClerk(this.getServerUrl(), email, password);
+      if (auth) {
+        this.settings.CLERK_SESSION_TOKEN = auth.token;
+        await this.saveSettings();
+        return true;
+      }
+      return false;
+    } catch (error) {
+      logger.error("Error signing in with Clerk:", error);
+      return false;
+    }
+  }
+
+  async refreshClerkToken(): Promise<boolean> {
+    if (!this.settings.CLERK_SESSION_TOKEN) return false;
+    
+    try {
+      const auth = await refreshClerkToken(this.getServerUrl(), this.settings.CLERK_SESSION_TOKEN);
+      if (auth) {
+        this.settings.CLERK_SESSION_TOKEN = auth.token;
+        await this.saveSettings();
+        return true;
+      }
+      return false;
+    } catch (error) {
+      logger.error("Error refreshing Clerk token:", error);
+      return false;
+    }
+  }
+
+  async isClerkTokenValid(): Promise<boolean> {
+    if (!this.settings.CLERK_SESSION_TOKEN) return false;
+    try {
+      return await isClerkTokenValid(this.getServerUrl(), this.settings.CLERK_SESSION_TOKEN);
+    } catch (error) {
+      logger.error("Error validating Clerk token:", error);
+      return false;
+    }
+  }
   async getCurrentFileLinks(file: TFile): Promise<LinkCache[]> {
     // force metadata cache to be loaded
     await this.app.vault.read(file);
@@ -461,7 +509,7 @@ export default class FileOrganizer extends Plugin {
     content: string,
     formattingInstruction: string,
     serverUrl: string,
-    apiKey: string,
+    apiKey: string, // Keep parameter for backward compatibility
     updateCallback: (partialContent: string) => void
   ): Promise<string> {
     const requestBody: any = {
@@ -475,7 +523,7 @@ export default class FileOrganizer extends Plugin {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
+        Authorization: `Bearer ${this.getAuthToken()}`,
       },
       body: JSON.stringify(requestBody),
     });
@@ -519,7 +567,7 @@ export default class FileOrganizer extends Plugin {
       method: "POST",
       body: formData,
       headers: {
-        Authorization: `Bearer ${this.settings.API_KEY}`,
+        Authorization: `Bearer ${this.getAuthToken()}`,
         // "Content-Type": "multipart/form-data",
       },
     });
@@ -570,7 +618,7 @@ export default class FileOrganizer extends Plugin {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${this.settings.API_KEY}`,
+        Authorization: `Bearer ${this.getAuthToken()}`,
       },
       body: JSON.stringify({
         content: trimmedContent,
@@ -766,7 +814,7 @@ export default class FileOrganizer extends Plugin {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${this.settings.API_KEY}`,
+        Authorization: `Bearer ${this.getAuthToken()}`,
       },
       body: JSON.stringify({
         image: base64Image,
@@ -828,7 +876,7 @@ export default class FileOrganizer extends Plugin {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${this.settings.API_KEY}`,
+        Authorization: `Bearer ${this.getAuthToken()}`,
       },
       body: JSON.stringify({
         content: trimmedContent,
@@ -859,7 +907,7 @@ export default class FileOrganizer extends Plugin {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${this.settings.API_KEY}`,
+        Authorization: `Bearer ${this.getAuthToken()}`,
       },
       body: JSON.stringify({
         content: trimmedContent,
@@ -1131,7 +1179,7 @@ export default class FileOrganizer extends Plugin {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${this.settings.API_KEY}`,
+        Authorization: `Bearer ${this.getAuthToken()}`,
       },
       body: JSON.stringify({
         content: trimmedContent,

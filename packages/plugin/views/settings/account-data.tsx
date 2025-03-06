@@ -22,14 +22,20 @@ export const AccountData: React.FC<AccountDataProps> = ({ plugin, onLicenseKeyCh
 
   const fetchUsageData = useCallback(async () => {
     try {
-      if (!plugin.settings.API_KEY) {
+      // Check if we have a Clerk token or API key
+      if (!plugin.settings.CLERK_SESSION_TOKEN && !plugin.settings.API_KEY) {
         setLoading(false);
         return;
       }
+      
+      // Determine which authentication method to use
+      const authHeader = plugin.settings.CLERK_SESSION_TOKEN
+        ? `Bearer ${plugin.settings.CLERK_SESSION_TOKEN}`
+        : `Bearer ${plugin.settings.API_KEY}`;
 
       const response = await fetch(`${plugin.getServerUrl()}/api/usage`, {
         headers: {
-          Authorization: `Bearer ${plugin.settings.API_KEY}`,
+          Authorization: authHeader,
         },
       });
       
@@ -52,7 +58,7 @@ export const AccountData: React.FC<AccountDataProps> = ({ plugin, onLicenseKeyCh
     return () => clearInterval(intervalId);
   }, [fetchUsageData]);
 
-  if (!plugin.settings.API_KEY) {
+  if (!plugin.settings.API_KEY && !plugin.settings.CLERK_SESSION_TOKEN) {
     return (
       <div className="bg-[--background-primary-alt] p-4 rounded-lg">
         <h3 className="text-lg font-medium mb-2 mt-0">Get Started</h3>
@@ -121,4 +127,4 @@ export const AccountData: React.FC<AccountDataProps> = ({ plugin, onLicenseKeyCh
       )}
     </div>
   );
-}; 
+};    

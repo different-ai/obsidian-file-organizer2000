@@ -56,7 +56,7 @@ export const FabricClassificationBox: React.FC<
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${plugin.settings.API_KEY}`,
+            Authorization: `Bearer ${plugin.getAuthToken()}`,
           },
           body: JSON.stringify({
             content: params.content,
@@ -95,7 +95,7 @@ export const FabricClassificationBox: React.FC<
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${plugin.settings.API_KEY}`,
+          Authorization: `Bearer ${plugin.getAuthToken()}`,
         },
         body: JSON.stringify({
           content: content,
@@ -223,7 +223,7 @@ export const FabricClassificationBox: React.FC<
         fileContent,
         systemContent,
         plugin.getServerUrl(),
-        plugin.settings.API_KEY,
+        plugin.getAuthToken(),
         updateCallback
       );
 
