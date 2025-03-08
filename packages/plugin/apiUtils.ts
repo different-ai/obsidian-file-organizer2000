@@ -85,3 +85,89 @@ export async function checkClerkAuth(
     return false;
   }
 }
+
+export async function refreshClerkToken(
+  serverUrl: string,
+  token: string
+): Promise<{ token: string } | null> {
+  try {
+    const response: RequestUrlResponse = await requestUrl({
+      url: `${serverUrl}/api/auth/refresh`,
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    
+    if (response.status === 200 && response.json?.token) {
+      logger.info("Successfully refreshed Clerk token");
+      return { token: response.json.token };
+    }
+    
+    logger.error(`Failed to refresh token: ${response.status}`);
+    return null;
+  } catch (error) {
+    logger.error("Error refreshing Clerk token:", error);
+    return null;
+  }
+}
+
+export async function isClerkTokenValid(
+  serverUrl: string,
+  token: string
+): Promise<boolean> {
+  try {
+    const response: RequestUrlResponse = await requestUrl({
+      url: `${serverUrl}/api/auth/validate`,
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    return response.status === 200;
+  } catch (error) {
+    logger.error("Error validating Clerk token:", error);
+    return false;
+  }
+}
+
+export async function handleAuthenticatedRequest<T>(
+  requestFn: () => Promise<T>,
+  plugin: any, // FileOrganizer instance
+  retryCount = 0
+): Promise<T> {
+  try {
+    // Attempt the API call
+    return await requestFn();
+  } catch (error: any) {
+    // Check if it's an authentication error (401 Unauthorized)
+    if (
+      error.message?.includes("401") ||
+      error.message?.includes("Unauthorized") ||
+      error.status === 401
+    ) {
+      logger.error("Authentication error detected:", error);
+      
+      // If we're using Clerk authentication and haven't exceeded retry attempts
+      if (plugin.settings.CLERK_SESSION_TOKEN && retryCount < 1) {
+        logger.info("Attempting to refresh Clerk token");
+        const refreshed = await plugin.refreshClerkToken();
+        
+        if (refreshed) {
+          logger.info("Token refreshed successfully, retrying request");
+          // Retry the request with the new token
+          return await handleAuthenticatedRequest(requestFn, plugin, retryCount + 1);
+        } else {
+          logger.error("Failed to refresh token, authentication may have expired");
+          // Show a notice to the user that they need to re-authenticate
+          new Notice("Your session has expired. Please sign in again.", 5000);
+        }
+      }
+    }
+    
+    // Re-throw the error for other error types or if token refresh failed
+    throw error;
+  }
+}
